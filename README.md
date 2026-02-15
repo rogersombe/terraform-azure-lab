@@ -1,64 +1,72 @@
-Terraform Azure Foundations: From Static to Structured IaC
-📜 Overview
-This project demonstrates a multi-stage evolution of Infrastructure as Code (IaC) maturity using Terraform and Azure. Rather than a simple one-time deployment, this repository tracks the transition from basic resource provisioning to a structured, variable-driven, and security-conscious architecture.
+Modular Azure Baseline: Hardened Identity-First Landing Zone
+📌 Project Overview
+This repository serves as a Technical Proof of Concept (PoC) for deploying a secure, scalable, and automated Azure environment. Moving beyond manual "Click-Ops," this project utilizes Infrastructure-as-Code (IaC) to orchestrate core platform components with a focus on Identity-as-Code and Zero-Trust network principles.
 
-🏗️ Deployed Infrastructure
-Azure Resource Group: The logical container for all lab assets.
+The goal of this project is to provide a "Hardened Baseline" that can be deployed repeatedly while maintaining strict configuration consistency.
 
-Azure Storage Account: A Standard_LRS account configured with environment-specific metadata.
+🏗️ Architectural Features
+1. Identity-as-Code & Governance
+Entra ID Integration: Declarative management of Security Groups and RBAC assignments.
 
-🚀 Project Evolution
-Stage 1: Basic Deployment
-Initial proof of concept focused on the core Terraform workflow (init → plan → apply).
+Zero-Trust Guardrails: (In Development) Automated deployment of Conditional Access policies to enforce MFA and device compliance.
 
-Goal: Successful communication with the AzureRM provider and state file generation.
+Least Privilege: Implementation of scoped Service Principals for Terraform execution.
 
-Key Outcome: Understanding the provider-resource relationship.
+2. Software-Defined Networking
+Hub-and-Spoke Ready: Modular VNET architecture designed for traffic isolation.
 
-Stage 2: Structured IaC (Current)
-Refactored the codebase to adhere to industry "Best Practices" for reusability and security.
+Security Groups: Implementation of Network Security Groups (NSGs) with "Deny-All" default logic.
 
-Separation of Concerns: Split configuration into main.tf, variables.tf, and outputs.tf.
+3. State & Lifecycle Management
+Idempotency: Using Terraform to ensure the environment matches the defined code, preventing configuration drift.
 
-Parameterization: Utilized variables.tf and terraform.tfvars to remove hardcoded values, allowing for environment parity.
+Remote State Management: Configured for Azure Blob Storage backend with State Locking to support team-based collaboration.
 
-Secrets Management: Implemented Sensitive Outputs to ensure that Storage Access Keys are protected from accidental exposure in terminal logs and CI/CD pipelines.
+Variable-Driven Design: Leveraging variables.tf and terraform.tfvars for environment abstraction (Dev/Prod parity).
 
-🧠 Key Engineering Concepts Demonstrated
-State & Idempotency: Verified that Terraform identifies "Configuration Drift." I successfully demonstrated that if a resource is modified manually in the Azure Portal, Terraform will detect the change and propose a plan to restore the "Source of Truth" defined in the code.
+🚀 Technical Stack
+Orchestration: Terraform (HCL)
 
-Implicit Dependencies: Configured the Storage Account to dynamically reference the Resource Group object. This ensures Terraform calculates the correct order of operations (building the "house" before the "furniture").
+Cloud Provider: Microsoft Azure
 
-Lifecycle Awareness: Identified which attribute changes (such as location or name) force a "Destroy and Recreate" action versus a "Modify In-Place" action.
+Automation: PowerShell Core
 
-🛠️ Technologies Used
-Terraform (HashiCorp)
+Version Control: Git / GitHub
 
-Azure Cloud Platform
+📂 Repository Structure
+Bash
+.
+├── modules/                # Reusable architectural components (Storage, VNET, Identity)
+├── environments/           # Environment-specific configurations
+├── main.tf                 # Primary orchestration logic
+├── variables.tf            # Input declarations for environment abstraction
+├── outputs.tf              # Schema for exporting resource metadata
+├── .gitignore              # Strict exclusion of .tfstate and secrets
+└── README.md               # Project documentation
+🛠️ Usage & Deployment
+Clone the Repository:
 
-Azure CLI (Authentication)
+Bash
+git clone https://github.com/rogersombe/terraform-azure-lab.git
+Initialize the Backend:
 
-HCL (HashiCorp Configuration Language)
+Bash
+terraform init
+Review the Plan:
 
-Git/GitHub (Version Control)
+Bash
+terraform plan -out=main.tfplan
+Execute Provisioning:
 
-🏁 How to Run
-Login: az login
+Bash
+terraform apply "main.tfplan"
+🔐 Security & Compliance
+Secret Management: No credentials are stored in code. Utilizing environment variables and Azure Key Vault for sensitive data.
 
-Initialize: terraform init
+State Security: Local state files are ignored via .gitignore; remote state is encrypted at rest.
 
-Plan: terraform plan
+Author: Rogers Sombe
 
-Deploy: terraform apply -auto-approve
+Role: Azure Cloud Engineer | Infrastructure & Identity Operations
 
-Clean up: terraform destroy
-
-🔮 Future Improvements (Stage 3 & Beyond)
-[ ] Remote State: Migrating from local .tfstate to an Azure Backend (Blob Storage with Locking).
-
-[ ] Network Hardening: Implementing Virtual Network rules and Private Endpoints for the Storage Account.
-
-[ ] Modularization: Abstracting the Storage Account into a reusable module.
-
-Author
-Rogers Sombe Aspiring Azure Cloud / DevSecOps Engineer
+Certification Path: AZ-104 (In Progress)
