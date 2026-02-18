@@ -1,14 +1,21 @@
 variable "resource_group_name" {
-  description = "Name of the Resource Group"
-  type        = string
+  type    = string
+  default = "rg-hardened-lab"
 }
 
 variable "location" {
-  description = "Azure region"
-  type        = string
+  type    = string
+  default = "East US"
 }
 
 variable "storage_account_name" {
-  description = "Globally unique storage account name"
+  type    = string
+  default = "rogstlab001"
+}
+
+# THIS IS THE MISSING PIECE
+variable "vault_name" {
+  description = "The name of the Key Vault"
   type        = string
+  default     = "rog-lab-vault-001"
 }
