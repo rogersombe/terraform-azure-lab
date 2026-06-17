@@ -1,3 +1,7 @@
+data "http" "my_public_ip" {
+  url = "https://ifconfig.me/ip"
+}
+
 # --- STAGE 1: RESOURCE GROUP ---
 resource "azurerm_resource_group" "lab_rg" {
   name     = var.resource_group_name
@@ -6,13 +10,11 @@ resource "azurerm_resource_group" "lab_rg" {
 
 # --- STAGE 2: STORAGE ACCOUNT ---
 resource "azurerm_storage_account" "lab_storage" {
-  name                     = var.storage_account_name
-  resource_group_name      = azurerm_resource_group.lab_rg.name
-  location                 = azurerm_resource_group.lab_rg.location
-  account_tier             = "Standard"
-  account_replication_type = "GRS"
-
-  # FIX: Updated deprecated argument
+  name                            = var.storage_account_name
+  resource_group_name             = azurerm_resource_group.lab_rg.name
+  location                        = azurerm_resource_group.lab_rg.location
+  account_tier                    = "Standard"
+  account_replication_type        = "GRS"
   https_traffic_only_enabled      = true
   min_tls_version                 = "TLS1_2"
   public_network_access_enabled   = false
@@ -79,25 +81,30 @@ resource "azurerm_key_vault" "lab_kv" {
   name                = var.vault_name
   location            = azurerm_resource_group.lab_rg.location
   resource_group_name = azurerm_resource_group.lab_rg.name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
 
-  # Ensure these point to the data source in providers.tf
-  tenant_id = data.azurerm_client_config.current.tenant_id
-
-  sku_name                      = "premium"
-  soft_delete_retention_days    = 7
-  purge_protection_enabled      = true
-  enabled_for_disk_encryption   = true
-  public_network_access_enabled = false
+  sku_name                        = "premium"
+  soft_delete_retention_days      = 7
+  purge_protection_enabled        = true
+  enabled_for_disk_encryption     = true
+  
+  # Locked down: private endpoint access only
+  public_network_access_enabled   = false 
 
   network_acls {
     bypass         = "AzureServices"
-    default_action = "Deny"
+    default_action = "Deny" 
   }
 
   access_policy {
     tenant_id          = data.azurerm_client_config.current.tenant_id
     object_id          = data.azurerm_client_config.current.object_id
-    key_permissions    = ["Get", "Create", "Delete", "List", "Restore", "Recover", "UnwrapKey", "WrapKey", "Purge"]
+    
+    # ADDED: GetRotationPolicy and SetRotationPolicy to satisfy the new Azure requirements
+    key_permissions    = [
+      "Get", "Create", "Delete", "List", "Restore", "Recover", "UnwrapKey", 
+      "WrapKey", "Purge", "GetRotationPolicy", "SetRotationPolicy"
+    ]
     secret_permissions = ["Get", "Set", "List", "Delete", "Purge"]
   }
 
