@@ -1,13 +1,8 @@
-data "http" "my_public_ip" {
-  url = "https://ifconfig.me/ip"
-}
-
 # --- STAGE 1: RESOURCE GROUP ---
 resource "azurerm_resource_group" "lab_rg" {
   name     = var.resource_group_name
   location = var.location
 }
-
 # --- STAGE 2: STORAGE ACCOUNT ---
 resource "azurerm_storage_account" "lab_storage" {
   name                            = var.storage_account_name

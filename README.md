@@ -46,6 +46,22 @@ flowchart TD
 
 ---
 
+## Architecture Diagrams (Graphviz)
+
+Detailed architecture diagrams live in [`/docs`](./docs/). Each answers one question:
+
+| Diagram | Question |
+|---------|----------|
+| [Infrastructure](./docs/infrastructure.svg) | What Azure resources exist? |
+| [Identity Flow](./docs/identity-flow.svg) | How does trust move through the system? |
+| [Zero Trust](./docs/zero-trust.svg) | Where are the network boundaries? |
+| [Dependency](./docs/dependency.svg) | In what order does Terraform build this? |
+
+Diagrams are derived from Terraform source and verified against `main.tf`. Re-render with:
+`dot -Tsvg docs/<name>.dot -o docs/<name>.svg`
+
+---
+
 ## What This Deploys (verified)
 
 ### Identity-First Authentication
@@ -75,6 +91,7 @@ flowchart TD
 * **Conditional Access** — automated MFA and device-compliance policies.
 * **Remote state backend** — Azure Blob Storage backend with state locking for team collaboration.
 * **Queue properties refactor** — migrate to the `azurerm_storage_account_queue_properties` resource ahead of AzureRM v5.0.
+* **CMK resource refactor** — migrate `key_vault_id` and `key_name` to updated argument syntax ahead of AzureRM v5.0.
 
 ---
 
@@ -96,9 +113,20 @@ terraform apply
 ```
 > Requires an authenticated Azure CLI session (`az login`) and Terraform ≥ 1.x.
 
+---
+
 ## Repository Structure
 ```bash
 .
+├── docs/
+│   ├── infrastructure.dot   # Physical resource graph (source)
+│   ├── infrastructure.svg   # Physical resource graph (rendered)
+│   ├── identity-flow.dot    # Identity & trust chain (source)
+│   ├── identity-flow.svg    # Identity & trust chain (rendered)
+│   ├── zero-trust.dot       # Network boundary flow (source)
+│   ├── zero-trust.svg       # Network boundary flow (rendered)
+│   ├── dependency.dot       # Terraform creation order (source)
+│   └── dependency.svg       # Terraform creation order (rendered)
 ├── main.tf          # Primary orchestration logic (RG, Storage, VNET, Key Vault, Endpoints)
 ├── providers.tf     # AzureRM provider + Entra identity data source
 ├── variables.tf     # Input declarations for environment abstraction

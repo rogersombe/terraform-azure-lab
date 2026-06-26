@@ -1,0 +1,128 @@
+digraph Infrastructure {
+    graph [
+        label="INFRASTRUCTURE DIAGRAM — Physical Azure Resources and Relationships\nDerived from Terraform | terraform-azure-lab | Checkov 31/31 Clean"
+        labelloc=t
+        fontname="Helvetica"
+        fontsize=14
+        fontcolor="#f0f6fc"
+        bgcolor="#0d1117"
+        pad=1.0
+        nodesep=0.8
+        ranksep=1.2
+        rankdir=TB
+        splines=polyline
+    ]
+
+    node [fontname="Helvetica" fontsize=10 style="filled,rounded" shape=box margin="0.2,0.12"]
+    edge [fontname="Helvetica" fontsize=9]
+
+    // ── Tier 0: Subscription ──────────────────────────────────────
+    Subscription [
+        label="Azure Subscription"
+        shape=cylinder
+        fillcolor="#161b22" fontcolor="#f0f6fc" color="#58a6ff"
+    ]
+
+    // ── Tier 1: Resource Group ────────────────────────────────────
+    RG [
+        label="Resource Group\nrg-hardened-lab | East US"
+        fillcolor="#0d419d" fontcolor="white" color="#388bfd"
+    ]
+
+    // ── Tier 2: Core Resources ────────────────────────────────────
+    Storage [
+        label="Storage Account\nrogstlab001\n─────────────────────\nSystem-Assigned Identity\nGRS Replication\nHTTPS Only | TLS 1.2 minimum\nNo Public Access\nShared Keys: DISABLED\nBlob Versioning: ON | Retention: 7d\nQueue Logging: ON | Retention: 7d"
+        fillcolor="#1f6feb" fontcolor="white" color="#79c0ff"
+    ]
+
+    MI [
+        label="System-Assigned\nManaged Identity\n(principal_id feeds KV access_policy[1])"
+        fillcolor="#264f78" fontcolor="#cae8ff" color="#58a6ff"
+        style="filled,rounded,dashed"
+    ]
+
+    VNET [
+        label="Virtual Network\nrogers-vnet\n10.0.0.0/16"
+        fillcolor="#0a3069" fontcolor="#79c0ff" color="#1f6feb"
+    ]
+
+    NSG [
+        label="NSG\ndb-security-group\n─────────────────────\nAllowInternal (Inbound)\nSource: 10.0.0.0/16\nProtocol: TCP | Any Port"
+        fillcolor="#9e6a03" fontcolor="white" color="#d29922"
+    ]
+
+    KV [
+        label="Key Vault (Premium)\nrog-lab-vault-001\n─────────────────────\nHSM Enabled\nPurge Protection: ON\nSoft Delete: 7 days\nNo Public Access\nAzureServices Bypass\nDisk Encryption: Enabled"
+        fillcolor="#6e40c9" fontcolor="white" color="#8957e5"
+    ]
+
+    // ── Tier 3: Subnet & KV Key ───────────────────────────────────
+    Subnet [
+        label="Subnet\nsnet-endpoints\n10.0.3.0/24"
+        fillcolor="#0a3069" fontcolor="#79c0ff" color="#388bfd"
+    ]
+
+    KVKey [
+        label="RSA-HSM Key\nstorage-encryption-key\n─────────────────────\n2048-bit\nExpiry: 2027-12-30\nOps: decrypt / encrypt / sign\nunwrapKey / wrapKey / verify"
+        fillcolor="#553098" fontcolor="#d2a8ff" color="#8957e5"
+    ]
+
+    // ── Tier 4: Private Endpoints ─────────────────────────────────
+    PE_KV [
+        label="Private Endpoint\npe-keyvault\nsubresource: vault"
+        fillcolor="#1a7f37" fontcolor="white" color="#3fb950"
+        shape=diamond
+    ]
+
+    PE_Storage [
+        label="Private Endpoint\npe-storage\nsubresource: blob"
+        fillcolor="#1a7f37" fontcolor="white" color="#3fb950"
+        shape=diamond
+    ]
+
+    // ── CMK Binding ───────────────────────────────────────────────
+    CMK [
+        label="Customer-Managed Key Binding\nstorage_cmk\nStorage ↔ Key Vault ↔ RSA-HSM Key"
+        fillcolor="#b62324" fontcolor="white" color="#f85149"
+        shape=ellipse
+    ]
+
+    // ── Relationships ─────────────────────────────────────────────
+
+    // Hierarchy: Subscription → RG → Resources
+    Subscription -> RG       [label="contains"            color="#58a6ff" fontcolor="#8b949e"]
+    RG -> Storage            [label="contains"            color="#1f6feb" fontcolor="#8b949e"]
+    RG -> VNET               [label="contains"            color="#1f6feb" fontcolor="#8b949e"]
+    RG -> KV                 [label="contains"            color="#1f6feb" fontcolor="#8b949e"]
+    RG -> NSG                [label="contains"            color="#1f6feb" fontcolor="#8b949e"]
+
+    // Network hierarchy
+    VNET -> Subnet           [label="contains"            color="#0a3069" fontcolor="#8b949e"]
+    Subnet -> PE_KV          [label="hosts"               color="#3fb950" fontcolor="#8b949e"]
+    Subnet -> PE_Storage     [label="hosts"               color="#3fb950" fontcolor="#8b949e"]
+    NSG -> Subnet            [label="associated\n(endpoints_assoc)"
+                              style=dashed color="#d29922" fontcolor="#8b949e"]
+
+    // Key Vault hierarchy
+    KV -> KVKey              [label="contains / HSM-protected"
+                              color="#8957e5" fontcolor="#8b949e"]
+
+    // Private endpoint links
+    PE_KV -> KV              [label="private link"
+                              style=dashed color="#3fb950" fontcolor="#8b949e"]
+    PE_Storage -> Storage    [label="private link"
+                              style=dashed color="#3fb950" fontcolor="#8b949e"]
+
+    // Identity flow
+    Storage -> MI            [label="has identity"
+                              style=dashed color="#58a6ff" fontcolor="#8b949e"]
+    MI -> KV                 [label="access_policy[1]\nGet / UnwrapKey / WrapKey ONLY"
+                              style=dashed color="#58a6ff" fontcolor="#8b949e"]
+
+    // CMK binding
+    CMK -> Storage           [label="encrypts"            color="#f85149" fontcolor="#8b949e"]
+    CMK -> KV                [label="key source"
+                              style=dashed color="#f85149" fontcolor="#8b949e"]
+    CMK -> KVKey             [label="uses"
+                              style=dashed color="#f85149" fontcolor="#8b949e"]
+}

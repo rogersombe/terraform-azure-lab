@@ -1,0 +1,111 @@
+digraph IdentityFlow {
+    graph [
+        label="IDENTITY FLOW DIAGRAM — Authentication, Authorization and Key Usage\nDerived from Terraform | terraform-azure-lab | Checkov 31/31 Clean"
+        labelloc=t
+        fontname="Helvetica"
+        fontsize=14
+        fontcolor="#f0f6fc"
+        bgcolor="#0d1117"
+        pad=1.0
+        nodesep=1.2
+        ranksep=1.0
+        rankdir=TB
+    ]
+
+    node [fontname="Helvetica" fontsize=10 style="filled,rounded" shape=box margin="0.2,0.12"]
+    edge [fontname="Helvetica" fontsize=9]
+
+    // ── Main Trust Chain (left column) ────────────────────────────
+    SA_start [
+        label="Storage Account\nrogstlab001\n(System-Assigned Identity)"
+        fillcolor="#1f6feb" fontcolor="white" color="#79c0ff"
+    ]
+
+    EntraID [
+        label="Entra ID (Azure AD)\nAuthentication\nstorage_use_azuread = true"
+        fillcolor="#0d419d" fontcolor="white" color="#388bfd"
+    ]
+
+    KV [
+        label="Key Vault (Premium)\nrog-lab-vault-001\naccess_policy[1]: principal_id of storage\nPermissions: Get | UnwrapKey | WrapKey"
+        fillcolor="#6e40c9" fontcolor="white" color="#8957e5"
+    ]
+
+    KVKey [
+        label="RSA-HSM Key\nstorage-encryption-key\n2048-bit | Expiry: 2027-12-30"
+        fillcolor="#553098" fontcolor="#d2a8ff" color="#8957e5"
+    ]
+
+    SA_end [
+        label="Storage Account\nrogstlab001\nEncrypted with Customer-Managed Key\nshared_access_key_enabled = false"
+        fillcolor="#1a7f37" fontcolor="white" color="#3fb950"
+    ]
+
+    // ── Admin / Operator path (side) ──────────────────────────────
+    Admin [
+        label="Admin / Operator\nTerraform Client\n(azurerm_client_config.current)"
+        fillcolor="#9e6a03" fontcolor="white" color="#d29922"
+    ]
+
+    // ── Annotation notes (right column) ──────────────────────────
+    A1 [
+        label="1. IDENTITY EXISTS\nStorage has a system-assigned managed identity.\nNo keys. No passwords. No connection strings."
+        shape=note fillcolor="#161b22" fontcolor="#8b949e" color="#30363d"
+    ]
+
+    A2 [
+        label="2. IDENTITY PROVES ITSELF\nAuthenticates to Entra ID using its managed identity.\nNo human credential involved in this path."
+        shape=note fillcolor="#161b22" fontcolor="#8b949e" color="#30363d"
+    ]
+
+    A3 [
+        label="3. AUTHORIZATION — LEAST PRIVILEGE\nKey Vault access_policy[1] grants storage identity ONLY:\nGet | UnwrapKey | WrapKey on one key.\nScoped to this principal. Nothing else."
+        shape=note fillcolor="#161b22" fontcolor="#8b949e" color="#30363d"
+    ]
+
+    A_admin [
+        label="Admin access_policy[0]:\nGet / Create / Delete / List\nRestore / Recover / Purge\nUnwrapKey / WrapKey\nGetRotationPolicy / SetRotationPolicy"
+        shape=note fillcolor="#161b22" fontcolor="#8b949e" color="#30363d"
+    ]
+
+    A4 [
+        label="4. KEY USAGE\nStorage identity unwraps the encryption key\nvia the AzureServices trusted bypass path.\n(network_acls bypass = AzureServices)"
+        shape=note fillcolor="#161b22" fontcolor="#8b949e" color="#30363d"
+    ]
+
+    A5 [
+        label="5. RESULT\nData at rest encrypted with customer-managed key.\nShared key access disabled — no connection strings.\nEntra ID is the only valid authentication path."
+        shape=note fillcolor="#161b22" fontcolor="#8b949e" color="#30363d"
+    ]
+
+    // ── Main trust chain edges ────────────────────────────────────
+    SA_start -> EntraID [
+        label="authenticates as itself\n(managed identity — no password)"
+        color="#388bfd" fontcolor="#79c0ff"
+    ]
+    EntraID -> KV [
+        label="identity verified → authorization evaluated"
+        color="#8957e5" fontcolor="#d2a8ff"
+    ]
+    KV -> KVKey [
+        label="grants access to one key only"
+        color="#8957e5" fontcolor="#d2a8ff"
+    ]
+    KVKey -> SA_end [
+        label="key unwrapped → storage encrypted"
+        color="#3fb950" fontcolor="#56d364"
+    ]
+
+    // ── Admin side path ───────────────────────────────────────────
+    Admin -> KV [
+        label="access_policy[0]\nfull key management\nfor Terraform operations"
+        style=dashed color="#d29922" fontcolor="#d29922"
+    ]
+
+    // ── Rank alignment: main nodes with their annotations ─────────
+    { rank=same; SA_start; A1 }
+    { rank=same; EntraID;  A2 }
+    { rank=same; KV;       A3;     Admin; A_admin }
+    { rank=same; KVKey;    A4 }
+    { rank=same; SA_end;   A5 }
+}

@@ -1,0 +1,108 @@
+digraph ZeroTrust {
+    graph [
+        label="ZERO TRUST NETWORK FLOW — Private-Only Access, No Public Internet Path\nDerived from Terraform | terraform-azure-lab | Checkov 31/31 Clean"
+        labelloc=t
+        fontname="Helvetica"
+        fontsize=14
+        fontcolor="#f0f6fc"
+        bgcolor="#0d1117"
+        pad=1.0
+        nodesep=0.8
+        ranksep=1.2
+        rankdir=LR
+    ]
+
+    node [fontname="Helvetica" fontsize=10 style="filled,rounded" shape=box margin="0.2,0.12"]
+    edge [fontname="Helvetica" fontsize=9]
+
+    // ── Public zone (outside VNet) ────────────────────────────────
+    Internet [
+        label="Internet\n(Public)"
+        shape=triangle
+        fillcolor="#3d1a1a" fontcolor="#f85149" color="#f85149"
+    ]
+
+    Block [
+        label="✗  PUBLIC ACCESS DISABLED\n─────────────────────────────\npublic_network_access_enabled = false\n(Storage Account + Key Vault)\nnetwork_acls default_action = Deny\n(Key Vault)"
+        shape=octagon
+        fillcolor="#3d1a1a" fontcolor="#f85149" color="#f85149"
+    ]
+
+    // ── Target resources (outside VNet, behind private endpoints) ─
+    KV [
+        label="Key Vault (Premium)\nrog-lab-vault-001\n─────────────────\nNo public endpoint\nnetwork_acls: Deny by default\nAzureServices bypass: ON"
+        fillcolor="#6e40c9" fontcolor="white" color="#8957e5"
+    ]
+
+    Storage [
+        label="Storage Account\nrogstlab001\n─────────────────\nNo public endpoint\nShared Keys: DISABLED\nEntra ID auth only"
+        fillcolor="#1f6feb" fontcolor="white" color="#79c0ff"
+    ]
+
+    // ── AzureServices trusted path note ──────────────────────────
+    AzureBypass [
+        label="AzureServices Trusted Path\n─────────────────────────────\nnetwork_acls bypass = AzureServices\nUsed ONLY for CMK key unwrap:\nStorage identity → Key Vault\nNot a public internet path."
+        fillcolor="#264f78" fontcolor="#cae8ff" color="#58a6ff"
+        style="filled,rounded,dashed"
+    ]
+
+    // ── VNet boundary ─────────────────────────────────────────────
+    subgraph cluster_vnet {
+        label="Virtual Network: rogers-vnet (10.0.0.0/16)"
+        style=filled
+        fillcolor="#0d1b2a"
+        color="#1f6feb"
+        fontcolor="#79c0ff"
+        fontsize=11
+
+        subgraph cluster_subnet {
+            label="Subnet: snet-endpoints (10.0.3.0/24)"
+            style=filled
+            fillcolor="#0d2137"
+            color="#388bfd"
+            fontcolor="#79c0ff"
+            fontsize=10
+
+            NSG [
+                label="NSG\ndb-security-group\n──────────────────\nAllowInternal (Inbound)\nSource: 10.0.0.0/16 ONLY\nProtocol: TCP | Any Port\nAll external traffic: DENIED"
+                fillcolor="#9e6a03" fontcolor="white" color="#d29922"
+            ]
+
+            PE_KV [
+                label="Private Endpoint\npe-keyvault\n(vault subresource)\nPrivate IP in subnet"
+                fillcolor="#1a7f37" fontcolor="white" color="#3fb950"
+                shape=diamond
+            ]
+
+            PE_Storage [
+                label="Private Endpoint\npe-storage\n(blob subresource)\nPrivate IP in subnet"
+                fillcolor="#1a7f37" fontcolor="white" color="#3fb950"
+                shape=diamond
+            ]
+
+            // NSG governs the endpoints
+            NSG -> PE_KV      [label="governs inbound" color="#d29922" fontcolor="#d29922"]
+            NSG -> PE_Storage [label="governs inbound" color="#d29922" fontcolor="#d29922"]
+        }
+    }
+
+    // ── Blocked public paths ──────────────────────────────────────
+    Internet -> Block     [label="attempt public access"
+                           color="#f85149" fontcolor="#f85149" style=bold]
+    Block -> KV           [label="DENIED" style=dashed
+                           color="#f85149" fontcolor="#f85149" arrowhead=none]
+    Block -> Storage      [label="DENIED" style=dashed
+                           color="#f85149" fontcolor="#f85149" arrowhead=none]
+
+    // ── Allowed private paths ─────────────────────────────────────
+    PE_KV -> KV           [label="private link\n(allowed — no public internet)"
+                           color="#3fb950" fontcolor="#56d364"]
+    PE_Storage -> Storage [label="private link\n(allowed — no public internet)"
+                           color="#3fb950" fontcolor="#56d364"]
+
+    // ── CMK AzureServices bypass (not public) ────────────────────
+    Storage -> AzureBypass [label="CMK: unwrap key request"
+                             style=dashed color="#58a6ff" fontcolor="#79c0ff"]
+    AzureBypass -> KV      [label="AzureServices bypass\n(trusted, internal — not public)"
+                             style=dashed color="#58a6ff" fontcolor="#79c0ff"]
+}

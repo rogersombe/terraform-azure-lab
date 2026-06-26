@@ -1,0 +1,121 @@
+digraph Dependency {
+    graph [
+        label="TERRAFORM DEPENDENCY GRAPH — Resource Creation Order\nDerived from Terraform | terraform-azure-lab | Arrows = depends on (source must exist first)"
+        labelloc=t
+        fontname="Helvetica"
+        fontsize=14
+        fontcolor="#f0f6fc"
+        bgcolor="#0d1117"
+        pad=1.0
+        nodesep=0.7
+        ranksep=1.0
+        rankdir=TB
+    ]
+
+    node [fontname="Helvetica" fontsize=9 style="filled,rounded" shape=box margin="0.15,0.1"]
+    edge [fontname="Helvetica" fontsize=8 color="#58a6ff" fontcolor="#8b949e"]
+
+    // ── Resources (numbered by creation order) ────────────────────
+
+    n1 [
+        label="①  azurerm_resource_group\nlab_rg\nrg-hardened-lab | East US"
+        fillcolor="#0d419d" fontcolor="white" color="#388bfd"
+    ]
+
+    n2 [
+        label="②  azurerm_virtual_network\nmain\nrogers-vnet | 10.0.0.0/16"
+        fillcolor="#0a3069" fontcolor="#79c0ff" color="#1f6feb"
+    ]
+
+    n3 [
+        label="③  azurerm_storage_account\nlab_storage\nrogstlab001 | SystemAssigned Identity"
+        fillcolor="#1f6feb" fontcolor="white" color="#79c0ff"
+    ]
+
+    n4 [
+        label="④  azurerm_key_vault\nlab_kv\nrog-lab-vault-001 | Premium / HSM\nNeeds: lab_storage.identity[0].principal_id"
+        fillcolor="#6e40c9" fontcolor="white" color="#8957e5"
+    ]
+
+    n5 [
+        label="⑤  azurerm_subnet\nendpoints\nsnet-endpoints | 10.0.3.0/24"
+        fillcolor="#0a3069" fontcolor="#79c0ff" color="#388bfd"
+    ]
+
+    n6 [
+        label="⑥  azurerm_network_security_group\ndb_nsg\ndb-security-group"
+        fillcolor="#9e6a03" fontcolor="white" color="#d29922"
+    ]
+
+    n7 [
+        label="⑦  azurerm_key_vault_key\nstorage_key\nstorage-encryption-key | RSA-HSM 2048"
+        fillcolor="#553098" fontcolor="#d2a8ff" color="#8957e5"
+    ]
+
+    n8 [
+        label="⑧  azurerm_private_endpoint\nkv_pe\npe-keyvault → vault"
+        fillcolor="#1a7f37" fontcolor="white" color="#3fb950"
+    ]
+
+    n9 [
+        label="⑨  azurerm_private_endpoint\nstorage_pe\npe-storage → blob"
+        fillcolor="#1a7f37" fontcolor="white" color="#3fb950"
+    ]
+
+    n10 [
+        label="⑩  azurerm_storage_account_customer_managed_key\nstorage_cmk\nStorage ↔ Key Vault ↔ RSA-HSM Key"
+        fillcolor="#b62324" fontcolor="white" color="#f85149"
+    ]
+
+    n11 [
+        label="⑪  azurerm_subnet_network_security_group_association\nendpoints_assoc\nSubnet ↔ NSG"
+        fillcolor="#5a3e00" fontcolor="#d29922" color="#d29922"
+    ]
+
+    // ── Dead code annotation ──────────────────────────────────────
+    dead [
+        label="⚠  data.http.my_public_ip\nDECLARED but UNREFERENCED\nDead code — safe to remove"
+        shape=note
+        fillcolor="#3d1a1a" fontcolor="#f85149" color="#f85149"
+        style="filled,dashed"
+    ]
+
+    // ── Dependency edges (source must exist before destination) ───
+
+    // Everything in the resource group
+    n1 -> n2  [label="rg.location / rg.name"]
+    n1 -> n3  [label="rg.location / rg.name"]
+    n1 -> n4  [label="rg.location / rg.name"]
+    n1 -> n5  [label="rg.name"]
+    n1 -> n6  [label="rg.location / rg.name"]
+    n1 -> n8  [label="rg.location / rg.name"]
+    n1 -> n9  [label="rg.location / rg.name"]
+
+    // Network hierarchy
+    n2 -> n5  [label="vnet.name"]
+
+    // Storage identity feeds Key Vault access policy
+    n3 -> n4  [label="identity[0].principal_id\n→ access_policy[1].object_id"
+               color="#388bfd" fontcolor="#79c0ff"]
+
+    // Key Vault key depends on Key Vault
+    n4 -> n7  [label="key_vault_id" color="#8957e5" fontcolor="#d2a8ff"]
+
+    // Private endpoints
+    n4 -> n8  [label="private_connection_resource_id"]
+    n5 -> n8  [label="subnet_id"]
+    n3 -> n9  [label="private_connection_resource_id"]
+    n5 -> n9  [label="subnet_id"]
+
+    // CMK binding requires storage + kv + key
+    n3 -> n10 [label="storage_account_id" color="#f85149" fontcolor="#f85149"]
+    n4 -> n10 [label="key_vault_id"       color="#f85149" fontcolor="#f85149"]
+    n7 -> n10 [label="key_name"           color="#f85149" fontcolor="#f85149"]
+
+    // NSG association requires subnet + NSG
+    n5 -> n11 [label="subnet_id"]
+    n6 -> n11 [label="network_security_group_id"]
+
+    // Dead code floats at top — no real dependency
+    dead -> n1 [style=invis]
+}
