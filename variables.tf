@@ -5,7 +5,7 @@ variable "resource_group_name" {
 
 variable "location" {
   type    = string
-  default = "East US"
+  default = "uksouth"
 }
 
 variable "storage_account_name" {
@@ -13,9 +13,13 @@ variable "storage_account_name" {
   default = "rogstlab001"
 }
 
-# THIS IS THE MISSING PIECE
 variable "vault_name" {
   description = "The name of the Key Vault"
   type        = string
   default     = "rog-lab-vault-001"
+}
+
+variable "deployment_ip" {
+  description = "Public IP of the deploying workstation. Permitted through the Key Vault firewall for MANAGEMENT PLANE operations only (creating and rotating keys). The DATA PLANE (storage account to vault, key unwrap) routes exclusively over the private endpoint."
+  type        = string
 }

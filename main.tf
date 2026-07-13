@@ -3,6 +3,7 @@ resource "azurerm_resource_group" "lab_rg" {
   name     = var.resource_group_name
   location = var.location
 }
+
 # --- STAGE 2: STORAGE ACCOUNT ---
 resource "azurerm_storage_account" "lab_storage" {
   name                            = var.storage_account_name
@@ -71,45 +72,71 @@ resource "azurerm_network_security_group" "db_nsg" {
   }
 }
 
-# --- STAGE 4: KEY VAULT ---
+# --- STAGE 4: KEY VAULT (RBAC authorization plane) ---
+# Authorization is delegated to Azure RBAC, not Key Vault access policies.
+# This brings the vault under the same identity control plane as the rest of
+# Azure: same role definitions, same scope inheritance, PIM-eligible, and
+# reviewable via Entra access reviews.
 resource "azurerm_key_vault" "lab_kv" {
   name                = var.vault_name
   location            = azurerm_resource_group.lab_rg.location
   resource_group_name = azurerm_resource_group.lab_rg.name
   tenant_id           = data.azurerm_client_config.current.tenant_id
 
-  sku_name                        = "premium"
-  soft_delete_retention_days      = 7
-  purge_protection_enabled        = true
-  enabled_for_disk_encryption     = true
-  
-  # Locked down: private endpoint access only
-  public_network_access_enabled   = false 
+  sku_name                    = "premium"
+  soft_delete_retention_days  = 7
+  purge_protection_enabled    = true
+  enabled_for_disk_encryption = true
+
+  # RBAC instead of legacy access policies
+  rbac_authorization_enabled = true
+
+  # DESIGN NOTE - management plane vs data plane.
+  #
+  # Setting public_network_access_enabled = false does NOT coexist with an IP
+  # allowlist: it overrides network_acls entirely, and the ip_rules below are
+  # never evaluated. A workstation-based deploy therefore cannot reach the
+  # vault's data plane to create a key. That is not a bug - it is the vault
+  # refusing to trust anything that did not arrive over private link.
+  #
+  # The posture chosen here: the public endpoint exists, but denies by default.
+  # Exactly one IP is permitted, for MANAGEMENT PLANE operations (key creation
+  # and rotation). The storage account continues to reach the vault over the
+  # PRIVATE ENDPOINT for DATA PLANE operations (key wrap/unwrap).
+  #
+  # The production-correct pattern is a VNet-integrated build agent, which
+  # removes the need for this allowlist entirely. See Roadmap.
+  public_network_access_enabled = true
 
   network_acls {
     bypass         = "AzureServices"
-    default_action = "Deny" 
-  }
-
-  access_policy {
-    tenant_id          = data.azurerm_client_config.current.tenant_id
-    object_id          = data.azurerm_client_config.current.object_id
-    
-    # ADDED: GetRotationPolicy and SetRotationPolicy to satisfy the new Azure requirements
-    key_permissions    = [
-      "Get", "Create", "Delete", "List", "Restore", "Recover", "UnwrapKey", 
-      "WrapKey", "Purge", "GetRotationPolicy", "SetRotationPolicy"
-    ]
-    secret_permissions = ["Get", "Set", "List", "Delete", "Purge"]
-  }
-
-  access_policy {
-    tenant_id       = data.azurerm_client_config.current.tenant_id
-    object_id       = azurerm_storage_account.lab_storage.identity[0].principal_id
-    key_permissions = ["Get", "UnwrapKey", "WrapKey"]
+    default_action = "Deny"
+    ip_rules       = [var.deployment_ip]
   }
 }
 
+# --- STAGE 4a: RBAC ROLE ASSIGNMENTS ---
+
+# Deploying principal: full key lifecycle management. Scoped to this vault only.
+resource "azurerm_role_assignment" "kv_crypto_officer" {
+  scope                = azurerm_key_vault.lab_kv.id
+  role_definition_name = "Key Vault Crypto Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
+# Storage account's system-assigned identity: wrap/unwrap ONLY.
+# The minimum viable permission for customer-managed key encryption. It cannot
+# read, create, or delete keys. It can only use the one it has been given.
+resource "azurerm_role_assignment" "storage_cmk_user" {
+  scope                = azurerm_key_vault.lab_kv.id
+  role_definition_name = "Key Vault Crypto Service Encryption User"
+  principal_id         = azurerm_storage_account.lab_storage.identity[0].principal_id
+}
+
+# --- STAGE 4b: ENCRYPTION KEY ---
+# depends_on is required: RBAC role assignments propagate asynchronously and
+# more slowly than legacy access policies. Without this, Terraform races the
+# authorization plane and key creation fails with a 403.
 resource "azurerm_key_vault_key" "storage_key" {
   name            = "storage-encryption-key"
   key_vault_id    = azurerm_key_vault.lab_kv.id
@@ -117,6 +144,8 @@ resource "azurerm_key_vault_key" "storage_key" {
   key_size        = 2048
   expiration_date = "2027-12-30T23:59:59Z"
   key_opts        = ["decrypt", "encrypt", "sign", "unwrapKey", "verify", "wrapKey"]
+
+  depends_on = [azurerm_role_assignment.kv_crypto_officer]
 }
 
 # --- STAGE 5: ENDPOINTS & ASSOCIATIONS ---
@@ -152,6 +181,8 @@ resource "azurerm_storage_account_customer_managed_key" "storage_cmk" {
   storage_account_id = azurerm_storage_account.lab_storage.id
   key_vault_id       = azurerm_key_vault.lab_kv.id
   key_name           = azurerm_key_vault_key.storage_key.name
+
+  depends_on = [azurerm_role_assignment.storage_cmk_user]
 }
 
 resource "azurerm_subnet_network_security_group_association" "endpoints_assoc" {
