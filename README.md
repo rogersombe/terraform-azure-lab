@@ -78,7 +78,7 @@ Two role assignments, both scoped to the vault alone:
 
 | Principal | Role | Why |
 |---|---|---|
-| Deploying principal | `Key Vault Crypto Officer` | Create and rotate the encryption key. Management plane. |
+| Deploying principal | `Key Vault Crypto Officer` | Create and rotate the encryption key. Data plane. |
 | Storage account's managed identity | `Key Vault Crypto Service Encryption User` | Wrap/unwrap only. It cannot read, create, or delete keys — it can only *use* the one it has been given. |
 
 **Propagation note:** RBAC role assignments replicate asynchronously and more slowly than access policies. Key creation must declare `depends_on` the role assignment, or Terraform races the authorization plane and fails with a 403. This is eventual consistency in Azure's control plane, and it must be designed for.
@@ -94,7 +94,7 @@ Two role assignments, both scoped to the vault alone:
 * **Private Endpoints** for both vault and storage. The storage → vault key-unwrap path never traverses the public internet.
 * **Network Security Group** with internal-only inbound rules, associated to the endpoints subnet.
 
-#### Design note — management plane vs data plane
+#### Design note — two routes to the vault's data plane
 
 An earlier iteration set `public_network_access_enabled = false` on the vault *and* declared an IP allowlist. That deployment failed:
 
@@ -108,14 +108,16 @@ InnerError={"code":"ForbiddenByConnection"}
 
 The cause is non-obvious and worth stating plainly: **`public_network_access_enabled = false` overrides `network_acls` entirely.** The IP allowlist is never evaluated. The vault had been isolated so completely that the deploying principal could not reach its own data plane to create a key.
 
-That is not a bug. It is the vault correctly refusing to trust anything that did not arrive over private link. But it forces a decision, because the two planes have genuinely different requirements:
+That is not a bug. It is the vault correctly refusing to trust anything that did not arrive over private link. But it forces a decision, because the two callers need different routes to the same data plane:
 
-| Plane | Actor | Path | Posture |
+| Route | Actor | Path | Posture |
 |---|---|---|---|
-| **Management** | Terraform, deploying | Public endpoint, default-deny firewall, single IP | Permitted by explicit allowlist |
-| **Data** | Storage account, unwrapping the CMK | Private Endpoint | Never touches the internet |
+| **Workstation route** (data plane) | Terraform, deploying: creates and rotates the key | Public endpoint, default-deny firewall, single IP | Permitted by explicit allowlist |
+| **Private route** (data plane) | Storage account, unwrapping the CMK | Private Endpoint | Never touches the internet |
 
-The posture chosen here permits the *management* plane by IP while the *data* plane stays private. Checkov concurs that this is a locked-down vault: `CKV_AZURE_189` (*"Ensure that Azure Key Vault disables public network access"*) **passes**, because a default-deny firewall with a single allowlisted IP is not an open endpoint.
+Both routes are data plane: the firewall governs access to what is *inside* the vault (keys, secrets, certificates). It does not govern the control plane (creating or changing the vault resource itself), which is controlled by Azure RBAC.
+
+The posture chosen here lets the deploying workstation in by IP for key creation and rotation, while the storage account's own key use stays on the private route. Checkov concurs that this is a locked-down vault: `CKV_AZURE_189` (*"Ensure that Azure Key Vault disables public network access"*) **passes**, because a default-deny firewall with a single allowlisted IP is not an open endpoint.
 
 The production-correct alternative is a **VNet-integrated build agent**, which removes the allowlist — and the dynamic-IP dependency — entirely. See Roadmap.
 
@@ -154,7 +156,7 @@ terraform apply
 ```
 > Requires an authenticated Azure CLI session (`az login`) and Terraform ≥ 1.x.
 >
-> `terraform.tfvars` must supply `deployment_ip` — the public IP of the deploying workstation, permitted through the Key Vault firewall for management-plane operations. This file is gitignored.
+> `terraform.tfvars` must supply `deployment_ip` — the public IP of the deploying workstation, permitted through the Key Vault firewall for key creation and rotation (data-plane operations). This file is gitignored.
 
 ---
 
