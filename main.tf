@@ -91,18 +91,22 @@ resource "azurerm_key_vault" "lab_kv" {
   # RBAC instead of legacy access policies
   rbac_authorization_enabled = true
 
-  # DESIGN NOTE - management plane vs data plane.
+  # DESIGN NOTE - two routes to the vault's DATA plane.
   #
   # Setting public_network_access_enabled = false does NOT coexist with an IP
   # allowlist: it overrides network_acls entirely, and the ip_rules below are
   # never evaluated. A workstation-based deploy therefore cannot reach the
-  # vault's data plane to create a key. That is not a bug - it is the vault
-  # refusing to trust anything that did not arrive over private link.
+  # vault to create a key. That is not a bug - it is the vault refusing to
+  # trust anything that did not arrive over private link.
   #
   # The posture chosen here: the public endpoint exists, but denies by default.
-  # Exactly one IP is permitted, for MANAGEMENT PLANE operations (key creation
-  # and rotation). The storage account continues to reach the vault over the
-  # PRIVATE ENDPOINT for DATA PLANE operations (key wrap/unwrap).
+  # Exactly one IP is permitted, so the deploying workstation can create and
+  # rotate keys. Key operations are DATA plane, so the firewall governs them.
+  # The storage account reaches the vault over the PRIVATE ENDPOINT for its
+  # own data plane operations (key wrap/unwrap).
+  #
+  # The firewall does not govern the CONTROL plane (creating or changing the
+  # vault resource itself). Azure RBAC controls that.
   #
   # The production-correct pattern is a VNet-integrated build agent, which
   # removes the need for this allowlist entirely. See Roadmap.
