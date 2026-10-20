@@ -38,9 +38,26 @@ Your own subscription and people IDs go in `terraform.tfvars`, which is git-igno
 | 1 | `01-before-permanent-owner.png` | Rog held permanent Owner |
 | 2 | `02-permissions-error.png` | Permanent Owner removed; Rog can no longer view the assignments page |
 | 3 | `03-pending-approval.png` | The request was held for approval, not granted |
-| 4 | `04-approved.png` | A second person approved it |
+| 4 | `04-audit-trail.png` | The full record: request, approval by lab-it.admin, activation, and the system ending it after one hour |
 | 5 | `05-activated-with-end-time.png` | Owner granted with an end time about an hour away |
-| 6 | `06-expired.png` | It ended on its own, with no one removing it |
+| 6 | `06-active-empty.png` | After the end time, Rog holds no active roles |
+| 7 | `07-subscription-hidden.png` | With no rights left, Azure hides the subscription from Rog entirely |
+
+## What the audit trail shows
+
+All times are 19-20 Oct 2026 (the log shows them as written; the activation ran from just after midnight).
+
+| Time | Who | What happened |
+|---|---|---|
+| 19 Oct 11:57 pm | Rog | Rules for Owner set (1 hour, reason, approval) and eligibility created, both from Terraform |
+| 20 Oct 12:06 am | Rog | Permanent Owner removed |
+| 12:07 am | Rog | Two early requests for Owner, which Azure refused while the removal was still settling |
+| 12:08 am | Rog | Request made, then held for approval |
+| 12:10:12 am | lab-it.admin | Request approved |
+| 12:10:20 am | Rog | Owner activated |
+| 1:10:20 am | Azure AD PIM | Owner removed automatically: "PIM activation expired" |
+
+That last row is the point of the lab: exactly one hour after activation, the system took the access away and nobody had to remember.
 
 ## The safety net
 
