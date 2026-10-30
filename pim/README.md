@@ -18,7 +18,7 @@ PIM (Privileged Identity Management, Microsoft's "admin access on request" featu
 
 **Who does what**
 
-- **Rog Somble** requests Owner when needed.
+- **Rog Sombe** requests Owner when needed.
 - **lab-it.admin** approves. Approving your own request proves nothing, so a second person is built in.
 - **terraform-lab-sp** (the robot account Terraform uses) stays permanent. A robot can't click "request access", so making it temporary would only break the pipeline. This decision is recorded in `../docs/adr-p3-pim.md`.
 
