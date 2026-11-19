@@ -1,0 +1,27 @@
+digraph ca_decision_flow {
+  rankdir=TB;
+  node [fontname="Helvetica", shape=box, style="rounded,filled", fillcolor="#f5f5f5"];
+  edge [fontname="Helvetica", fontsize=10];
+
+  start [label="Sign-in attempt"];
+  bg    [shape=diamond, label="Break-glass\naccount?"];
+  skip  [label="All three policies skipped\n(excluded by design)", fillcolor="#d9ead3"];
+
+  legacy [shape=diamond, label="Legacy protocol?\nCA003"];
+  block  [label="BLOCK", fillcolor="#f4cccc"];
+
+  admin [shape=diamond, label="In IT Admins group?\nCA001"];
+  fin   [shape=diamond, label="In Finance group?\nCA002"];
+  mfa   [label="Require MFA", fillcolor="#fff2cc"];
+  none  [label="No policy applies\n(access allowed)", fillcolor="#d9ead3"];
+
+  start  -> bg;
+  bg     -> skip   [label="yes"];
+  bg     -> legacy [label="no"];
+  legacy -> block  [label="yes"];
+  legacy -> admin  [label="no"];
+  admin  -> mfa    [label="yes"];
+  admin  -> fin    [label="no"];
+  fin    -> mfa    [label="yes"];
+  fin    -> none   [label="no"];
+}
