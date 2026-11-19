@@ -62,3 +62,5 @@ Connect-MgGraph -Scopes "Policy.Read.All","Policy.ReadWrite.ConditionalAccess","
 ![Conditional Access decision flow](../docs/ca-decision-flow.svg)
 
 Decision record: [docs/adr-p2-conditional-access.md](../docs/adr-p2-conditional-access.md)
+
+**After the licence lapsed:** checked at 00:07 on 19 Nov 2026, seven minutes after the trial's stated expiry, all three policies still showed On with no licensing warning ([screenshot](evidence/11-policies-after-licence-lapse.png)). Whether they keep enforcing was not tested, and a later check may differ.
